@@ -1,0 +1,31 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-recruit}
+      POSTGRES_PASSWORD: ${DB_PASS:-secret}
+      POSTGRES_DB: ${DB_NAME:-recruitment}
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # backend:
+  #   build: ./backend
+  #   restart: unless-stopped
+  #   depends_on: [db]
+  #   env_file: ./backend/.env
+  #   ports:
+  #     - '4000:4000'
+
+  # frontend:
+  #   build: ./frontend
+  #   restart: unless-stopped
+  #   depends_on: [backend]
+  #   ports:
+  #     - '3000:3000'
+
+volumes:
+  pgdata:

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node test-imap.js)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); p.type='module'; require\\('fs'\\).writeFileSync\\('./package.json', JSON.stringify\\(p,null,2\\)+'\\\\n'\\)\")",
+      "Bash(node -e \"require\\('i18next'\\); require\\('react-i18next'\\); console.log\\('ok'\\)\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\LENOVO\\\\Desktop\\\\recruitment-system\\\\backend\" | Where-Object { $_.Name -notmatch 'node_modules' } | Select-Object Name)",
+      "PowerShell(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\LENOVO\\\\Desktop\\\\recruitment-system\\\\backend\\\\uploads\\\\resumes\")",
+      "PowerShell(New-Item -ItemType File -Force \"C:\\\\Users\\\\LENOVO\\\\Desktop\\\\recruitment-system\\\\backend\\\\uploads\\\\resumes\\\\.gitkeep\")",
+      "Bash(node -e \"require\\('./src/services/aiService'\\); console.log\\('aiService loads OK'\\)\")",
+      "Bash(node -e \"console.log\\(require\\('@google/generative-ai/package.json'\\).version\\)\")",
+      "Bash(node -e \"require\\('./src/services/aiService'\\); console.log\\('OK'\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"require\\('./src/services/emailService'\\)\")",
+      "Bash(npm audit *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\LENOVO\\\\Desktop\\\\recruitment-system\" -Force)"
+    ]
+  }
+}
