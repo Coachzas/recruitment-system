@@ -226,7 +226,3 @@ recruitment-system/
 5. เปิด HTTPS ด้วย `certbot --nginx`
 
 ---
-
-## 👤 ผู้พัฒนา
-
-สร้างสำหรับ Toyota Motor Thailand — ระบบรับสมัครงานภายใน
