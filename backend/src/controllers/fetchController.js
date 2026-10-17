@@ -4,6 +4,7 @@ const { pollUnreadEmails } = require('../services/emailService');
 
 // Prevent overlapping fetches — one run at a time
 let _fetching = false;
+let _fetchStatus = { running: false, summary: null, error: null };
 
 /**
  * POST /api/fetch/manual
@@ -48,6 +49,7 @@ async function manualFetch(req, res, next) {
     );
 
     _fetching = true;
+    _fetchStatus = { running: true, summary: null, error: null };
 
     // Fire and forget — prevents HTTP timeout on large inboxes.
     // Results appear in the email table as they're processed.
@@ -61,15 +63,34 @@ async function manualFetch(req, res, next) {
       .then(({ results, summary }) => {
         const apps    = results.filter((r) => r.applicantId).length;
         const general = results.filter((r) => !r.applicantId && !r.candidateData).length;
+        const failedConnections = summary.connection_errors || [];
+        _fetchStatus = {
+          running: true,
+          summary,
+          error: failedConnections.length
+            ? failedConnections.map((item) => `${item.label} (${item.phase}, ${item.code}): ${item.message}`).join(' ')
+            : null,
+        };
         console.log(
           `[ManualFetch] Complete — ${results.length} processed | ` +
           `${apps} applications saved | ${general} general` +
           (summary.skipped_dedup > 0 ? ` | ${summary.skipped_dedup} dedup-skipped` : '') +
+          (failedConnections.length ? ` | ${failedConnections.length} IMAP account(s) failed` : '') +
           (summary.quota_stopped ? ' | stopped by quota' : '')
         );
       })
-      .catch((err) => console.error('[ManualFetch] Background error:', err.message))
-      .finally(() => { _fetching = false; });
+      .catch((err) => {
+        const failures = err.connectionErrors || [];
+        const error = failures.length
+          ? failures.map((item) => `${item.label} (${item.phase}, ${item.code}): ${item.message}`).join(' ')
+          : err.message;
+        console.error('[ManualFetch] Background error:', error);
+        _fetchStatus = { running: true, summary: null, error };
+      })
+      .finally(() => {
+        _fetching = false;
+        _fetchStatus = { ..._fetchStatus, running: false };
+      });
 
     res.json({
       started:  true,
@@ -85,7 +106,7 @@ async function manualFetch(req, res, next) {
 
 /** GET /api/fetch/status — lets the UI check whether a fetch is running */
 function fetchStatus(req, res) {
-  res.json({ running: _fetching });
+  res.json(_fetchStatus);
 }
 
 module.exports = { manualFetch, fetchStatus };

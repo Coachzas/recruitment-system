@@ -6,12 +6,18 @@ const { randomUUID }   = require('crypto');
 const fsp  = require('fs').promises;
 const path = require('path');
 
-const imapConfig = require('../config/imap');
 const env        = require('../config/env');
 
 const { query }        = require('../config/db');
 const { extractText }  = require('../utils/parseResume');
 const { QuotaError }   = require('./aiService');
+const {
+  buildImapConfig,
+  describeImapError,
+  normalizeGmailPassword,
+  preferDetailedError,
+  resolvePublicImapHost,
+} = require('./imapConnectionService');
 const {
   extractBasicInfo,
   extractAndScore,
@@ -22,6 +28,8 @@ const {
   saveEmailLog,
   saveApplicant,
   saveEmailAttachments,
+  getActiveConnections,
+  updateConnectionHealth,
 } = require('./storageService');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -41,6 +49,23 @@ const RESUME_MIME_TYPES = new Set([
 ]);
 
 const RESUME_DIR = path.resolve(__dirname, '../../uploads/resumes');
+
+async function getImapConnections() {
+  const savedConnections = await getActiveConnections();
+  if (savedConnections.length) return savedConnections;
+
+  return [{
+    id: null,
+    label: 'Environment IMAP account',
+    host: env.IMAP_HOST,
+    port: env.IMAP_PORT,
+    secure: env.IMAP_SECURE,
+    username: env.IMAP_USER,
+    password: normalizeGmailPassword(env.IMAP_HOST.trim().toLowerCase(), env.IMAP_PASS),
+    mailbox: env.IMAP_MAILBOX || 'INBOX',
+    trustedHost: true,
+  }];
+}
 
 // ─── Triage patterns ──────────────────────────────────────────────────────────
 //
@@ -432,6 +457,60 @@ async function runPipelineForEmail(metadata, { forceReprocess = false } = {}) {
  * @returns {Promise<{ results: Array, summary: Object }>}
  */
 async function pollUnreadEmails(opts = {}) {
+  const connections = await getImapConnections();
+  const summary = {
+    found: 0,
+    processed: 0,
+    skipped_dedup: 0,
+    quota_stopped: false,
+    reason_zero: null,
+    connection_errors: [],
+  };
+  const results = [];
+  let remainingBatch = Number(opts.maxBatch) || 0;
+
+  for (const connection of connections) {
+    if (Number(opts.maxBatch) > 0 && remainingBatch <= 0) break;
+
+    try {
+      const cycle = await pollConnection(connection, {
+        ...opts,
+        maxBatch: Number(opts.maxBatch) > 0 ? remainingBatch : 0,
+      });
+      results.push(...cycle.results);
+      summary.found += cycle.summary.found;
+      summary.processed += cycle.summary.processed;
+      summary.skipped_dedup += cycle.summary.skipped_dedup;
+      summary.quota_stopped ||= cycle.summary.quota_stopped;
+      summary.reason_zero = summary.reason_zero || cycle.summary.reason_zero;
+      if (Number(opts.maxBatch) > 0) {
+        remainingBatch -= cycle.summary.found;
+      }
+      if (cycle.summary.quota_stopped) break;
+    } catch (error) {
+      const diagnostic = error.imapDiagnostic || describeImapError(error, connection);
+      summary.connection_errors.push({
+        connection_id: connection.id,
+        label: connection.label,
+        ...diagnostic,
+      });
+      console.error(
+        `[EmailService] IMAP account "${connection.label}" failed during ${diagnostic.phase} ` +
+        `(${diagnostic.code}): ${diagnostic.message}`
+      );
+    }
+  }
+
+  if (summary.connection_errors.length === connections.length) {
+    const error = new Error('Unable to fetch email from any configured IMAP account.');
+    error.connectionErrors = summary.connection_errors;
+    throw error;
+  }
+
+  return { results, summary };
+}
+
+async function pollConnection(connection, opts = {}) {
   const {
     since             = new Date(Date.now() - 24 * 60 * 60 * 1000),
     before            = null,
@@ -441,41 +520,56 @@ async function pollUnreadEmails(opts = {}) {
     interEmailDelayMs = 0,
   } = opts;
 
-  const client  = new ImapFlow(imapConfig);
+  let client;
   const results = [];
   let totalFound   = 0;
   let skippedDedup = 0;
   let quotaStopped = false;
   let reasonZero   = null;
+  let phase = 'connect';
+  let operationError = null;
+  let lock = null;
+  let eventError = null;
 
   try {
+    phase = 'DNS lookup';
+    const resolvedHost = connection.trustedHost
+      ? connection.host
+      : await resolvePublicImapHost(connection.host);
+    client = new ImapFlow(buildImapConfig({ ...connection, resolvedHost }));
+    client.on('error', (error) => {
+      eventError = error;
+    });
+    phase = 'connect';
     await client.connect();
-    console.log('[EmailService] IMAP connected');
+    phase = 'mailbox';
+    lock = await client.getMailboxLock(connection.mailbox || 'INBOX');
+    if (connection.id) {
+      await updateConnectionHealth(connection.id, 'verified');
+    }
+    console.log(`[EmailService] IMAP connected; mailbox "${connection.mailbox || 'INBOX'}" selected`);
 
-    const mailbox = env.IMAP_MAILBOX || 'INBOX';
-    const lock    = await client.getMailboxLock(mailbox);
+    phase = 'search';
+    const searchQuery = { since };
+    if (!includeRead && !forceReprocess) searchQuery.seen = false;
+    if (before) searchQuery.before = before;
 
-    try {
-      const searchQuery = { since };
-      if (!includeRead && !forceReprocess) searchQuery.seen = false;
-      if (before) searchQuery.before = before;
+    const allUids = await client.search(searchQuery, { uid: true });
+    totalFound = allUids?.length ?? 0;
 
-      const allUids = await client.search(searchQuery, { uid: true });
-      totalFound = allUids?.length ?? 0;
-
-      if (!allUids || allUids.length === 0) {
-        // Diagnostic: distinguish "inbox empty" from "all messages already read"
-        if (!includeRead && !forceReprocess) {
-          try {
-            const diagQuery = { since, seen: true };
-            if (before) diagQuery.before = before;
-            const seenUids = await client.search(diagQuery, { uid: true });
-            reasonZero = seenUids.length > 0 ? 'all_seen' : 'empty_window';
-          } catch { reasonZero = 'empty_window'; }
+    if (!allUids || allUids.length === 0) {
+      if (!includeRead && !forceReprocess) {
+        try {
+          const diagQuery = { since, seen: true };
+          if (before) diagQuery.before = before;
+          const seenUids = await client.search(diagQuery, { uid: true });
+          reasonZero = seenUids.length > 0 ? 'all_seen' : 'empty_window';
+        } catch {
+          reasonZero = 'empty_window';
         }
-        console.log(`[EmailService] No messages found.${reasonZero ? ` Reason: ${reasonZero}` : ''}`);
-      } else {
-
+      }
+      console.log(`[EmailService] No messages found.${reasonZero ? ` Reason: ${reasonZero}` : ''}`);
+    } else {
       const uids = maxBatch > 0 ? allUids.slice(0, maxBatch) : allUids;
       console.log(
         `[EmailService] ${allUids.length} message(s) found, processing ${uids.length}` +
@@ -484,19 +578,16 @@ async function pollUnreadEmails(opts = {}) {
 
       for (let i = 0; i < uids.length; i++) {
         const uid = uids[i];
+        phase = `fetch UID ${uid}`;
         try {
-
-          // ── Stage B: fetch full source — triage happens inside pipeline ────
           const message = await client.fetchOne(String(uid), { source: true }, { uid: true });
           if (!message?.source) {
             console.warn(`[EmailService] UID ${uid}: empty source — skipping`);
-            await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
             continue;
           }
 
           const metadata = await parseRawMessage(message.source, uid);
 
-          // ── Stage C: dedup — skip if message_id already processed ──────────
           if (!forceReprocess && metadata.messageId) {
             const { rows } = await query(
               'SELECT id FROM email_logs WHERE message_id = $1', [metadata.messageId]
@@ -504,47 +595,86 @@ async function pollUnreadEmails(opts = {}) {
             if (rows.length > 0) {
               console.log(`[C/dedup] UID ${uid}: already in log #${rows[0].id} — skipped`);
               skippedDedup++;
-              await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
               continue;
             }
           }
 
-          // ── Stage D: auto-triage + pipeline ───────────────────────────────
+          phase = `process UID ${uid}`;
           const result = await runPipelineForEmail(metadata, { forceReprocess });
           results.push(result);
 
+          phase = `mark UID ${uid} as seen`;
           await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
           console.log(`[EmailService] UID ${uid} marked \\Seen`);
 
-          // Inter-email rate-limit delay — applied after every processed email
-          // except the last one so we don't needlessly pause after finishing.
           if (interEmailDelayMs > 0 && i < uids.length - 1) {
             console.log(`[EmailService] Rate-limit pause: ${interEmailDelayMs}ms`);
             await sleep(interEmailDelayMs);
           }
-
         } catch (msgErr) {
-          // Quota exhausted — stop the entire batch immediately.
-          // Remaining UIDs are left unseen for the next fetch window.
           if (msgErr.isQuotaError) {
             console.error(`[EmailService] ${msgErr.message} — stopping batch, ${uids.length - i - 1} email(s) skipped.`);
             quotaStopped = true;
             break;
           }
-          console.error(`[EmailService] UID ${uid} error:`, msgErr.message);
-          try { await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true }); } catch {}
+          if (phase.startsWith('process UID')) {
+            console.error(
+              `[EmailService] Account "${connection.label}", UID ${uid} email processing failed:`,
+              msgErr.message
+            );
+            continue;
+          }
+          if (!msgErr.responseStatus && !msgErr.responseText && !msgErr.code) {
+            console.error(
+              `[EmailService] Account "${connection.label}", UID ${uid} processing failed:`,
+              msgErr.message
+            );
+            continue;
+          }
+          const diagnostic = describeImapError(msgErr, connection, phase);
+          console.error(
+            `[EmailService] Account "${connection.label}", UID ${uid}, ${phase} ` +
+            `(${diagnostic.code}): ${diagnostic.message}`
+          );
         }
       }
-      } // end else (allUids.length > 0)
-    } finally {
-      lock.release();
     }
   } catch (err) {
-    console.error('[EmailService] IMAP session error:', err.message);
-    throw err;
+    const diagnostic = describeImapError(preferDetailedError(err, eventError), connection, phase);
+    operationError = new Error(diagnostic.message);
+    operationError.imapDiagnostic = diagnostic;
+    if (connection.id) {
+      try {
+        await updateConnectionHealth(connection.id, 'failed', diagnostic.message);
+      } catch (healthError) {
+        console.error(`[EmailService] Could not update health for connection ${connection.id}:`, healthError.message);
+      }
+    }
+    throw operationError;
   } finally {
-    await client.logout();
-    console.log('[EmailService] IMAP disconnected');
+    if (lock) lock.release();
+    if (client?.usable) {
+      try {
+        await client.logout();
+        console.log(`[EmailService] IMAP account "${connection.label}" disconnected`);
+      } catch (logoutError) {
+        const diagnostic = describeImapError(logoutError, connection, 'logout');
+        console.warn(
+          `[EmailService] Logout failed for account "${connection.label}" ` +
+          `(${diagnostic.code}): ${diagnostic.message}`
+        );
+        client.close();
+        if (!operationError && connection.id) {
+          try {
+            await updateConnectionHealth(connection.id, 'failed', diagnostic.message);
+          } catch (healthError) {
+            console.error(`[EmailService] Could not update health for connection ${connection.id}:`, healthError.message);
+          }
+        }
+      }
+    } else {
+      client?.close();
+    }
   }
 
   return {
@@ -555,6 +685,7 @@ async function pollUnreadEmails(opts = {}) {
       skipped_dedup: skippedDedup,
       quota_stopped: quotaStopped,
       reason_zero:   reasonZero,
+      connection_errors: [],
     },
   };
 }

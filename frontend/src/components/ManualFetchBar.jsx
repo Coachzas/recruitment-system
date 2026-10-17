@@ -29,6 +29,8 @@ export default function ManualFetchBar({ onComplete }) {
         const res = await fetchRunningStatus();
         if (!res.running) {
           setRunning(false);
+          if (res.error) setError(res.error);
+          if (res.summary) setResult((current) => ({ ...current, summary: res.summary }));
           stopPolling();
           onComplete?.();   // refresh the email table
         }
@@ -154,6 +156,14 @@ export default function ManualFetchBar({ onComplete }) {
               ? t('manualFetch.batchUnlimited')
               : t('manualFetch.batchCap', { n: result.batchCap })}
           </div>
+          {result.summary && (
+            <div className="text-blue-700">
+              {t('manualFetch.resultSummary', {
+                processed: result.summary.processed,
+                found: result.summary.found,
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

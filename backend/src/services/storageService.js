@@ -1,6 +1,11 @@
 'use strict';
 
 const { query } = require('../config/db');
+const {
+  encryptImapPassword,
+  decryptImapPassword,
+  isEncryptedImapPassword,
+} = require('./cryptoService');
 
 // ─── Schema bootstrap ─────────────────────────────────────────────────────────
 
@@ -66,6 +71,20 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await query(`ALTER TABLE email_connections ADD COLUMN IF NOT EXISTS last_checked_at TIMESTAMPTZ`);
+  await query(`ALTER TABLE email_connections ADD COLUMN IF NOT EXISTS last_check_status TEXT NOT NULL DEFAULT 'unchecked'`);
+  await query(`ALTER TABLE email_connections ADD COLUMN IF NOT EXISTS last_check_error TEXT`);
+  const legacyConnections = await query(
+    `SELECT id, password FROM email_connections`
+  );
+  for (const connection of legacyConnections.rows) {
+    if (!isEncryptedImapPassword(connection.password)) {
+      await query(
+        `UPDATE email_connections SET password = $1 WHERE id = $2`,
+        [encryptImapPassword(connection.password), connection.id]
+      );
+    }
+  }
 
   // job_criteria
   await query(`
@@ -389,20 +408,62 @@ async function saveSchedulerSettings(data) {
 
 async function getConnections() {
   const r = await query(
-    `SELECT id, label, host, port, secure, username, mailbox, is_active, created_at
+    `SELECT id, label, host, port, secure, username, mailbox, is_active, created_at,
+            last_checked_at, last_check_status, last_check_error
      FROM email_connections ORDER BY created_at DESC`
   );
   return r.rows;
 }
 
+async function getActiveConnections() {
+  const r = await query(
+    `SELECT id, label, host, port, secure, username, password, mailbox
+     FROM email_connections WHERE is_active = true ORDER BY created_at ASC`
+  );
+
+  return Promise.all(r.rows.map(async (connection) => {
+    let password;
+    if (isEncryptedImapPassword(connection.password)) {
+      password = decryptImapPassword(connection.password);
+    } else {
+      password = connection.password;
+      await query(
+        `UPDATE email_connections SET password = $1 WHERE id = $2`,
+        [encryptImapPassword(password), connection.id]
+      );
+    }
+    return { ...connection, password };
+  }));
+}
+
 async function createConnection({ label, host, port, secure, username, password, mailbox }) {
   const r = await query(
-    `INSERT INTO email_connections (label, host, port, secure, username, password, mailbox)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
-     RETURNING id, label, host, port, secure, username, mailbox, is_active, created_at`,
-    [label, host, port ?? 993, secure ?? true, username, password, mailbox || 'INBOX']
+    `INSERT INTO email_connections
+       (label, host, port, secure, username, password, mailbox,
+        last_checked_at, last_check_status, last_check_error)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),'verified',NULL)
+     RETURNING id, label, host, port, secure, username, mailbox, is_active, created_at,
+               last_checked_at, last_check_status, last_check_error`,
+    [
+      label,
+      host,
+      port ?? 993,
+      secure ?? true,
+      username,
+      encryptImapPassword(password),
+      mailbox || 'INBOX',
+    ]
   );
   return r.rows[0];
+}
+
+async function updateConnectionHealth(id, status, error = null) {
+  await query(
+    `UPDATE email_connections
+     SET last_checked_at = NOW(), last_check_status = $2, last_check_error = $3
+     WHERE id = $1`,
+    [id, status, error]
+  );
 }
 
 async function deleteConnection(id) {
@@ -512,7 +573,7 @@ module.exports = {
   createSchedulerProfile, toggleSchedulerProfile, deleteSchedulerProfile,
   updateSchedulerProfile, touchSchedulerLastRun, saveSchedulerRunSummary,
   getSchedulerSettings, saveSchedulerSettings,
-  getConnections, createConnection, deleteConnection,
+  getConnections, getActiveConnections, createConnection, updateConnectionHealth, deleteConnection,
   getAiSettings, upsertAiSettings,
   countUsers, createUser, getUserByEmail, getUserById,
 };

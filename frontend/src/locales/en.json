@@ -98,6 +98,7 @@
     "running": "Running in background",
     "statusRunning": "Fetch in progress — emails will appear as they are processed.",
     "statusDone": "Fetch complete — email table has been refreshed.",
+    "resultSummary": "Processed {{processed}} of {{found}} messages.",
     "batchUnlimited": "unlimited batch",
     "batchCap": "batch cap: {{n}}",
     "errorBothDates": "Both dates are required.",
@@ -205,12 +206,22 @@
     "mailboxField": "Mailbox",
     "usernameField": "Username / Email *",
     "passwordField": "App Password *",
-    "tlsField": "Use TLS (recommended)",
+    "passwordHint": "For Gmail, spaces in the 16-character App Password are removed automatically.",
+    "tlsField": "Use implicit TLS (port 993; STARTTLS is required otherwise)",
+    "testConnection": "Test Connection",
+    "testingConnection": "Testing…",
     "addBtn": "Add Connection",
     "deleteConfirm": "Delete connection \"{{label}}\"?",
     "deleteFailed": "Delete failed.",
     "errorRequired": "Label, host, username, and password are required.",
-    "errorSave": "Failed to save connection."
+    "errorSave": "Failed to save connection.",
+    "errorLoad": "Failed to load saved connections.",
+    "errorTest": "IMAP connection test failed.",
+    "connectionStatus": {
+      "verified": "Verified",
+      "failed": "Failed",
+      "unchecked": "Not checked"
+    }
   },
   "applicants": {
     "title": "Applicants",

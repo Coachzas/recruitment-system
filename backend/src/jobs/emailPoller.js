@@ -138,10 +138,17 @@ async function runProfileCycle(profile) {
     });
     const saved = results.filter((r) => r.applicantId).length;
     runSummaryText = buildRunSummary(summary, saved);
+    if (summary.connection_errors?.length) {
+      runSummaryText += ` · ${summary.connection_errors.length} IMAP account(s) failed`;
+    }
     console.log(`[Scheduler] "${profile.profile_name}" complete — ${runSummaryText}`);
   } catch (err) {
-    console.error(`[Scheduler] "${profile.profile_name}" failed:`, err.message);
-    runSummaryText = `Error: ${err.message}`;
+    const failures = err.connectionErrors || [];
+    const detail = failures.length
+      ? failures.map((item) => `${item.label} (${item.phase}, ${item.code}): ${item.message}`).join(' ')
+      : err.message;
+    console.error(`[Scheduler] "${profile.profile_name}" failed:`, detail);
+    runSummaryText = `Error: ${detail}`;
   } finally {
     _firingCycles.delete(profile.id);
     try { await saveSchedulerRunSummary(profile.id, runSummaryText); } catch {}

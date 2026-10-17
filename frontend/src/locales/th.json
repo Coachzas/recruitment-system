@@ -98,6 +98,7 @@
     "running": "กำลังทำงานเบื้องหลัง",
     "statusRunning": "กำลังดึงข้อมูล — อีเมลจะปรากฏขึ้นเมื่อประมวลผลเสร็จ",
     "statusDone": "ดึงข้อมูลสำเร็จ — ตารางอีเมลได้รับการอัปเดตแล้ว",
+    "resultSummary": "ประมวลผล {{processed}} จาก {{found}} ข้อความ",
     "batchUnlimited": "ไม่จำกัดจำนวน",
     "batchCap": "จำกัด: {{n}} รายการ",
     "errorBothDates": "กรุณากรอกวันที่ทั้งสองช่อง",
@@ -205,12 +206,22 @@
     "mailboxField": "กล่องจดหมาย",
     "usernameField": "ชื่อผู้ใช้ / อีเมล *",
     "passwordField": "รหัสผ่านแอป *",
-    "tlsField": "ใช้ TLS (แนะนำ)",
+    "passwordHint": "สำหรับ Gmail ระบบจะลบช่องว่างใน App Password 16 ตัวอักษรให้อัตโนมัติ",
+    "tlsField": "ใช้ implicit TLS (พอร์ต 993; หากปิดจะบังคับ STARTTLS)",
+    "testConnection": "ทดสอบการเชื่อมต่อ",
+    "testingConnection": "กำลังทดสอบ…",
     "addBtn": "เพิ่มการเชื่อมต่อ",
     "deleteConfirm": "ลบการเชื่อมต่อ \"{{label}}\"?",
     "deleteFailed": "การลบล้มเหลว",
     "errorRequired": "กรุณากรอก ชื่อย่อ โฮสต์ ชื่อผู้ใช้ และรหัสผ่าน",
-    "errorSave": "บันทึกการเชื่อมต่อไม่สำเร็จ"
+    "errorSave": "บันทึกการเชื่อมต่อไม่สำเร็จ",
+    "errorLoad": "โหลดบัญชีที่บันทึกไว้ไม่สำเร็จ",
+    "errorTest": "ทดสอบการเชื่อมต่อ IMAP ไม่สำเร็จ",
+    "connectionStatus": {
+      "verified": "ตรวจสอบแล้ว",
+      "failed": "ล้มเหลว",
+      "unchecked": "ยังไม่ตรวจสอบ"
+    }
   },
   "applicants": {
     "title": "ผู้สมัครงาน",
