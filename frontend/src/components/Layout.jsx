@@ -1,9 +1,9 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import useStore    from '../store';
 import { logoutApi } from '../api/auth';
 
-export default function Layout() {
+export default function Layout({ children, demo = false }) {
   const { t, i18n } = useTranslation();
   const navigate    = useNavigate();
   const user        = useStore((s) => s.user);
@@ -21,12 +21,13 @@ export default function Layout() {
     navigate('/login', { replace: true });
   }
 
+  const prefix = demo ? '/demo' : '';
   const nav = [
-    { to: '/',            label: t('nav.dashboard'),   icon: '◈' },
-    { to: '/applicants',  label: t('nav.applicants'),  icon: '◎' },
-    { to: '/criteria',    label: t('nav.jobCriteria'), icon: '◉' },
-    { to: '/settings',    label: t('nav.connections'), icon: '⚙' },
-    { to: '/ai-settings', label: t('nav.aiSettings'),  icon: '✦' },
+    { to: `${prefix}/`,            label: t('nav.dashboard'),   icon: '◈' },
+    { to: `${prefix}/applicants`,  label: t('nav.applicants'),  icon: '◎' },
+    { to: `${prefix}/criteria`,    label: t('nav.jobCriteria'), icon: '◉' },
+    { to: `${prefix}/${demo ? 'connections' : 'settings'}`, label: t('nav.connections'), icon: '⚙' },
+    { to: `${prefix}/ai-settings`, label: t('nav.aiSettings'),  icon: '✦' },
   ];
 
   return (
@@ -45,7 +46,7 @@ export default function Layout() {
             <NavLink
               key={to}
               to={to}
-              end={to === '/'}
+              end={to === `${prefix}/`}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
                   isActive
@@ -61,7 +62,7 @@ export default function Layout() {
         </nav>
 
         {/* User info + logout */}
-        {user && (
+        {!demo && user && (
           <div className="px-4 py-3 border-t border-white/10">
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-6 h-6 rounded-full bg-toyota-red flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
@@ -81,7 +82,10 @@ export default function Layout() {
 
         {/* Footer: version + language toggle */}
         <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between gap-2">
-          <span className="text-[10px] text-gray-500 truncate">{t('nav.footer')}</span>
+          {demo
+            ? <Link to="/" className="text-[10px] text-gray-500 truncate hover:text-white">{t('demo.exitDemo')}</Link>
+            : <span className="text-[10px] text-gray-500 truncate">{t('nav.footer')}</span>
+          }
           <div className="flex gap-1 flex-shrink-0">
             {['en', 'th'].map((lng) => (
               <button
@@ -102,7 +106,12 @@ export default function Layout() {
 
       {/* ── Main content ── */}
       <main className="flex-1 overflow-y-auto bg-gray-100">
-        <Outlet />
+        {demo && (
+          <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 text-xs text-amber-800">
+            <span className="font-bold">{t('demo.readOnly')}:</span> {t('demo.notice')}
+          </div>
+        )}
+        {children ?? <Outlet />}
       </main>
     </div>
   );

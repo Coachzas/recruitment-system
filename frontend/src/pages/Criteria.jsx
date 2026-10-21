@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchCriteria, createCriteria, deleteCriteria } from '../api/criteria';
+import { demoCriteria } from '../data/demoData';
 
 // ── Tag input ────────────────────────────────────────────────────────────────
 function TagInput({ tags, onChange, placeholder }) {
@@ -42,12 +43,13 @@ function TagInput({ tags, onChange, placeholder }) {
 }
 
 // ── Criteria card ────────────────────────────────────────────────────────────
-function CriteriaCard({ row, onDelete }) {
+function CriteriaCard({ row, onDelete, readOnly }) {
   const [deleting, setDeleting] = useState(false);
   const skills  = Array.isArray(row.required_skills) ? row.required_skills : [];
   const bonuses = Array.isArray(row.bonus_criteria)  ? row.bonus_criteria  : [];
 
   async function handleDelete() {
+    if (readOnly) return;
     if (!confirm(`Delete criteria for "${row.job_title}"?`)) return;
     setDeleting(true);
     try { await deleteCriteria(row.id); onDelete(row.id); }
@@ -61,7 +63,7 @@ function CriteriaCard({ row, onDelete }) {
           <h3 className="font-bold text-toyota-dark text-base">{row.job_title}</h3>
           <p className="text-xs text-gray-400 mt-0.5">Min {row.min_experience_years ?? '—'} yr(s) experience</p>
         </div>
-        <button onClick={handleDelete} disabled={deleting}
+        <button onClick={handleDelete} disabled={readOnly || deleting}
                 className="text-xs text-red-400 hover:text-toyota-red font-semibold shrink-0">
           {deleting ? '…' : 'Delete'}
         </button>
@@ -98,24 +100,26 @@ function CriteriaCard({ row, onDelete }) {
 // ── Main page ────────────────────────────────────────────────────────────────
 const BLANK = { job_title: '', required_skills: [], min_experience_years: '', bonus_criteria: [] };
 
-export default function Criteria() {
-  const [list,    setList]    = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function Criteria({ demo = false }) {
+  const [list,    setList]    = useState(demo ? demoCriteria : []);
+  const [loading, setLoading] = useState(!demo);
   const [form,    setForm]    = useState(BLANK);
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState('');
 
   useEffect(() => {
+    if (demo) return;
     fetchCriteria()
       .then((res) => setList(res.criteria))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [demo]);
 
   function setField(key, val) { setForm((f) => ({ ...f, [key]: val })); }
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (demo) return;
     setError('');
     if (!form.job_title.trim())       { setError('Job title is required.'); return; }
     if (!form.required_skills.length) { setError('Add at least one required skill.'); return; }
@@ -153,6 +157,7 @@ export default function Criteria() {
             <h2 className="text-sm font-bold text-white uppercase tracking-wide">Add / Update Position</h2>
           </div>
           <form onSubmit={handleSubmit} className="p-4 space-y-4">
+            <fieldset disabled={demo} className="space-y-4 disabled:opacity-70">
             <div>
               <label className="label">Job Title *</label>
               <input className="input" placeholder="e.g. Frontend Developer"
@@ -184,6 +189,7 @@ export default function Criteria() {
                 {saving ? 'Saving…' : 'Save Criteria'}
               </button>
             </div>
+            </fieldset>
           </form>
         </div>
 
@@ -198,7 +204,7 @@ export default function Criteria() {
             <div className="card p-6 text-sm text-gray-400">No criteria yet. Add your first role on the left.</div>
           ) : (
             list.map((row) => (
-              <CriteriaCard key={row.id} row={row}
+              <CriteriaCard key={row.id} row={row} readOnly={demo}
                             onDelete={(id) => setList((l) => l.filter((r) => r.id !== id))} />
             ))
           )}

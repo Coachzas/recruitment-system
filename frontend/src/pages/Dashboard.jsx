@@ -8,7 +8,9 @@ import ModeToggle      from '../components/ModeToggle';
 import EmailTable      from '../components/EmailTable';
 import ManualFetchBar  from '../components/ManualFetchBar';
 import SchedulerModal  from '../components/SchedulerModal';
+import DemoSchedulerModal from '../components/DemoSchedulerModal';
 import FilterBar       from '../components/FilterBar';
+import { demoApplicants } from '../data/demoData';
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
@@ -109,7 +111,7 @@ function CountdownStrip({ earliestMs, activeCount, firingCount, onOpenModal }) {
 
 const BLANK_FILTERS = { startDate: '', endDate: '', subject: '', sender: '' };
 
-export default function Dashboard() {
+export default function Dashboard({ demo = false }) {
   const { t } = useTranslation();
   const {
     emails, emailsTotal, emailsPage, emailsMode, stats,
@@ -131,6 +133,7 @@ export default function Dashboard() {
 
   // Scheduler profiles — full load every 60 s
   useEffect(() => {
+    if (demo) return undefined;
     async function loadProfiles() {
       try {
         const res = await fetchSchedulerProfiles();
@@ -140,10 +143,11 @@ export default function Dashboard() {
     loadProfiles();
     const id = setInterval(loadProfiles, 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [demo]);
 
   // Scheduler status — lightweight poll every 5 s to detect firing profiles
   useEffect(() => {
+    if (demo) return undefined;
     let id;
     async function pollStatus() {
       try {
@@ -161,7 +165,7 @@ export default function Dashboard() {
     pollStatus();
     id = setInterval(pollStatus, 5_000);
     return () => clearInterval(id);
-  }, []);
+  }, [demo]);
 
   const { earliestMs, activeCount } = useSchedulerSummary(profiles);
 
@@ -172,6 +176,25 @@ export default function Dashboard() {
   // ─── Core loader ─────────────────────────────────────────────────────────────
 
   const loadEmails = useCallback(async () => {
+    if (demo) {
+      const sampleEmails = demoApplicants.map((candidate) => ({
+        id: candidate.id,
+        subject: candidate.subject,
+        sender: candidate.email,
+        received_at: candidate.received_at,
+        status: 'success',
+        mode: 'application',
+        match_score: candidate.match_score,
+        ai_summary: candidate.summary,
+        attachment_count: candidate.attachments.length,
+      }));
+      setEmails(sampleEmails, sampleEmails.length);
+      setStats({ total: sampleEmails.length, success: sampleEmails.length, failed: 0, ignored: 0 });
+      setEmailsLoading(false);
+      setEmailsError(null);
+      return;
+    }
+
     setEmailsLoading(true);
     setEmailsError(null);
     setSelectedIds(new Set());
@@ -196,9 +219,9 @@ export default function Dashboard() {
     } finally {
       setEmailsLoading(false);
     }
-  }, [emailsMode, emailsPage]);
+  }, [demo, emailsMode, emailsPage, setEmails, setEmailsError, setEmailsLoading, setStats]);
 
-  usePolling(loadEmails, 30_000, [emailsMode, emailsPage]);
+  usePolling(loadEmails, 30_000, [emailsMode, emailsPage], !demo);
 
   // Debounce filter changes — reset to page 1, then reload
   useEffect(() => {
@@ -229,6 +252,7 @@ export default function Dashboard() {
   }, [emails]);
 
   const handleBulkDelete = useCallback(async () => {
+    if (demo) return;
     if (selectedIds.size === 0) return;
     if (!confirm(t('dashboard.toolbar.deleteConfirm', { count: selectedIds.size }))) return;
     setDeleting(true);
@@ -241,7 +265,24 @@ export default function Dashboard() {
     } finally {
       setDeleting(false);
     }
-  }, [selectedIds, loadEmails, t]);
+  }, [demo, selectedIds, loadEmails, t]);
+
+  const displayedStats = demo
+    ? { total: demoApplicants.length, success: demoApplicants.length, failed: 0, ignored: 0 }
+    : stats;
+  const displayedEmails = demo
+    ? demoApplicants.map((candidate) => ({
+      id: candidate.id,
+      subject: candidate.subject,
+      sender: candidate.email,
+      received_at: candidate.received_at,
+      status: 'success',
+      mode: 'application',
+      match_score: candidate.match_score,
+      ai_summary: candidate.summary,
+      attachment_count: candidate.attachments.length,
+    }))
+    : emails;
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -254,12 +295,14 @@ export default function Dashboard() {
             {t('dashboard.title')}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {t('dashboard.subtitle')}
+            {t(demo ? 'dashboard.demoSubtitle' : 'dashboard.subtitle')}
           </p>
         </div>
         {/* Scheduler status widget */}
         <div className="flex items-center gap-2">
-          {firingCount > 0 ? (
+          {demo ? (
+            <span className="text-xs font-semibold text-gray-500">{t('demo.sampleData')}</span>
+          ) : firingCount > 0 ? (
             <>
               <span className="relative w-3 h-3">
                 <span className="absolute inset-0 w-3 h-3 rounded-full bg-toyota-red animate-ping opacity-75" />
@@ -275,10 +318,10 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label={t('dashboard.stats.total24h')}  value={stats?.total}   />
-        <StatCard label={t('dashboard.stats.success')}   value={stats?.success} accent="text-green-600" />
-        <StatCard label={t('dashboard.stats.failed')}    value={stats?.failed}  accent="text-toyota-red" />
-        <StatCard label={t('dashboard.stats.ignored')}   value={stats?.ignored} accent="text-gray-400" />
+        <StatCard label={t('dashboard.stats.total24h')}  value={displayedStats?.total}   />
+        <StatCard label={t('dashboard.stats.success')}   value={displayedStats?.success} accent="text-green-600" />
+        <StatCard label={t('dashboard.stats.failed')}    value={displayedStats?.failed}  accent="text-toyota-red" />
+        <StatCard label={t('dashboard.stats.ignored')}   value={displayedStats?.ignored} accent="text-gray-400" />
       </div>
 
       {/* Scheduler countdown strip */}
@@ -290,16 +333,24 @@ export default function Dashboard() {
       />
 
       {/* Manual fetch */}
-      <ManualFetchBar onComplete={loadEmails} />
+      <ManualFetchBar onComplete={loadEmails} readOnly={demo} />
 
       {/* Mode toggle + bulk-delete toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <ModeToggle />
+        {demo ? (
+          <div className="inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white">
+            {[t('demo.allEmails'), t('demo.applications'), t('demo.general')].map((label, index) => (
+              <button key={label} type="button" disabled className={`px-4 py-2 text-sm opacity-70 cursor-not-allowed ${index === 0 ? 'bg-toyota-red text-white' : 'text-gray-500'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : <ModeToggle />}
         <div className="flex items-center gap-3">
           {emailsError && (
             <span className="text-sm text-toyota-red font-medium">{emailsError}</span>
           )}
-          {selectedIds.size > 0 && (
+          {!demo && selectedIds.size > 0 && (
             <button
               onClick={handleBulkDelete}
               disabled={deleting}
@@ -310,7 +361,7 @@ export default function Dashboard() {
           )}
           <button
             onClick={loadEmails}
-            disabled={emailsLoading}
+            disabled={demo || emailsLoading}
             className="text-xs text-gray-500 hover:text-toyota-red transition-colors flex items-center gap-1"
           >
             {t('dashboard.toolbar.refresh')}
@@ -319,27 +370,31 @@ export default function Dashboard() {
       </div>
 
       {/* Filter bar */}
-      <FilterBar filters={filters} onChange={setFilters} />
+      <FilterBar filters={filters} onChange={setFilters} disabled={demo} />
 
       {/* Email table */}
       <EmailTable
-        emails={emails}
-        loading={emailsLoading}
-        total={emailsTotal}
+        emails={displayedEmails}
+        loading={demo ? false : emailsLoading}
+        total={demo ? displayedEmails.length : emailsTotal}
         page={emailsPage}
         limit={50}
         onPageChange={setEmailsPage}
         selectedIds={selectedIds}
         onSelectOne={handleSelectOne}
         onSelectAll={handleSelectAll}
+        readOnly={demo}
       />
 
       {/* Scheduler modal */}
-      <SchedulerModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onChanged={handleSchedulerChanged}
-      />
+      {demo
+        ? modalOpen && <DemoSchedulerModal onClose={() => setModalOpen(false)} />
+        : <SchedulerModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onChanged={handleSchedulerChanged}
+        />
+      }
     </div>
   );
 }

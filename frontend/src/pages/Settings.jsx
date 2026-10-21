@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchConnections, createConnection, testConnection, deleteConnection } from '../api/connections';
+import { demoConnections } from '../data/demoData';
 
 // ─── Connection Row ───────────────────────────────────────────────────────────
 
-function ConnectionRow({ conn, onDelete }) {
+function ConnectionRow({ conn, onDelete, readOnly }) {
   const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
 
   async function handleDelete() {
+    if (readOnly) return;
     if (!confirm(t('settings.deleteConfirm', { label: conn.label }))) return;
     setDeleting(true);
     try { await deleteConnection(conn.id); onDelete(conn.id); }
@@ -42,7 +44,7 @@ function ConnectionRow({ conn, onDelete }) {
         </span>
         <button
           onClick={handleDelete}
-          disabled={deleting}
+          disabled={readOnly || deleting}
           className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
         >
           {deleting ? '…' : t('common.delete')}
@@ -59,10 +61,10 @@ const BLANK = {
   secure: true, username: '', password: '', mailbox: 'INBOX',
 };
 
-export default function Settings() {
+export default function Settings({ demo = false }) {
   const { t } = useTranslation();
-  const [connections, setConnections] = useState([]);
-  const [loading, setLoading]         = useState(true);
+  const [connections, setConnections] = useState(demo ? demoConnections : []);
+  const [loading, setLoading]         = useState(!demo);
   const [form, setForm]               = useState(BLANK);
   const [saving, setSaving]           = useState(false);
   const [testing, setTesting]         = useState(false);
@@ -71,11 +73,12 @@ export default function Settings() {
   const [loadError, setLoadError]     = useState('');
 
   useEffect(() => {
+    if (demo) return;
     fetchConnections()
       .then((res) => setConnections(res.connections))
       .catch((err) => setLoadError(err?.error ?? t('settings.errorLoad')))
       .finally(() => setLoading(false));
-  }, [t]);
+  }, [demo, t]);
 
   function field(key) {
     return {
@@ -101,6 +104,7 @@ export default function Settings() {
   }
 
   async function handleTest() {
+    if (demo) return;
     setFormError('');
     setTestResult(null);
     if (!form.label.trim() || !form.host.trim() || !form.username.trim() || !form.password) {
@@ -121,6 +125,7 @@ export default function Settings() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (demo) return;
     setFormError('');
     if (!form.label || !form.host || !form.username || !form.password) {
       setFormError(t('settings.errorRequired'));
@@ -165,6 +170,7 @@ export default function Settings() {
             <ConnectionRow
               key={c.id}
               conn={c}
+              readOnly={demo}
               onDelete={(id) => setConnections((prev) => prev.filter((x) => x.id !== id))}
             />
           ))
@@ -179,6 +185,7 @@ export default function Settings() {
           </h2>
         </div>
         <form onSubmit={handleSubmit} className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <fieldset disabled={demo} className="contents">
           <div>
             <label className="label">{t('settings.labelField')}</label>
             <input className="input" placeholder="e.g. Main Gmail" {...field('label')} />
@@ -231,6 +238,7 @@ export default function Settings() {
               {saving ? t('common.saving') : t('settings.addBtn')}
             </button>
           </div>
+          </fieldset>
         </form>
       </div>
     </div>

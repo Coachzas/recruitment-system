@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { fetchApplicants } from '../api/applicants';
+import { demoApplicants } from '../data/demoData';
 
 function fmt(dateStr) {
   if (!dateStr) return '—';
@@ -39,7 +40,7 @@ function Skeleton() {
 
 const BLANK = { search: '', position: '', minScore: '' };
 
-export default function Applicants() {
+export default function Applicants({ demo = false }) {
   const { t }    = useTranslation();
   const navigate = useNavigate();
 
@@ -54,6 +55,25 @@ export default function Applicants() {
   const LIMIT = 50;
 
   const load = useCallback(async (p = 1, f = filters) => {
+    if (demo) {
+      const query = f.search.trim().toLowerCase();
+      const position = f.position.trim().toLowerCase();
+      const minScore = Number(f.minScore);
+      const filtered = demoApplicants.filter((candidate) => {
+        const matchesQuery = !query || [candidate.full_name, candidate.email, candidate.position_applied]
+          .some((value) => value.toLowerCase().includes(query));
+        const matchesPosition = !position || candidate.position_applied.toLowerCase().includes(position);
+        const matchesScore = !f.minScore || candidate.match_score >= minScore;
+        return matchesQuery && matchesPosition && matchesScore;
+      });
+      setApplicants(filtered);
+      setTotal(filtered.length);
+      setPage(1);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -70,7 +90,7 @@ export default function Applicants() {
     } finally {
       setLoading(false);
     }
-  }, [filters, t]);
+  }, [demo, filters, t]);
 
   useEffect(() => { load(1, BLANK); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -179,7 +199,7 @@ export default function Applicants() {
                     : applicants.map((a, idx) => (
                       <tr
                         key={a.id}
-                        onClick={() => navigate(`/applicants/${a.id}`)}
+                        onClick={() => navigate(`${demo ? '/demo' : ''}/applicants/${a.id}`)}
                         className="hover:bg-red-50 cursor-pointer transition-colors"
                       >
                         <td className="px-4 py-3 text-gray-400 text-xs">

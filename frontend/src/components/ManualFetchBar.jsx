@@ -9,7 +9,7 @@ const weekAgoStr = () => {
   return d.toISOString().slice(0, 10);
 };
 
-export default function ManualFetchBar({ onComplete }) {
+export default function ManualFetchBar({ onComplete, readOnly = false }) {
   const { t } = useTranslation();
   const [startDate, setStartDate] = useState(weekAgoStr);
   const [endDate,   setEndDate]   = useState(todayStr);
@@ -51,6 +51,7 @@ export default function ManualFetchBar({ onComplete }) {
   useEffect(() => () => stopPolling(), []);
 
   async function handleFetch() {
+    if (readOnly) return;
     if (!startDate || !endDate) { setError(t('manualFetch.errorBothDates')); return; }
     if (startDate > endDate)    { setError(t('manualFetch.errorDateOrder')); return; }
     setError('');
@@ -95,7 +96,7 @@ export default function ManualFetchBar({ onComplete }) {
             className="input"
             value={startDate}
             max={endDate}
-            disabled={busy}
+            disabled={readOnly || busy}
             onChange={(e) => { setStartDate(e.target.value); setError(''); setResult(null); }}
           />
         </div>
@@ -110,14 +111,14 @@ export default function ManualFetchBar({ onComplete }) {
             value={endDate}
             min={startDate}
             max={todayStr()}
-            disabled={busy}
+            disabled={readOnly || busy}
             onChange={(e) => { setEndDate(e.target.value); setError(''); setResult(null); }}
           />
         </div>
 
         <button
           onClick={handleFetch}
-          disabled={busy}
+          disabled={readOnly || busy}
           className="btn-primary self-end flex items-center gap-2 h-[38px] whitespace-nowrap disabled:opacity-50"
         >
           {loading ? (

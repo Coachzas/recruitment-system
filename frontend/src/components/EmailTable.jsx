@@ -38,7 +38,7 @@ function Skeleton({ cols }) {
 
 export default function EmailTable({
   emails, loading, total, page, limit = 50, onPageChange,
-  selectedIds, onSelectOne, onSelectAll,
+  selectedIds, onSelectOne, onSelectAll, readOnly = false,
 }) {
   const { t } = useTranslation();
   const totalPages = Math.ceil(total / limit);
@@ -64,7 +64,8 @@ export default function EmailTable({
                   ref={masterRef}
                   checked={allChecked}
                   onChange={(e) => onSelectAll?.(e.target.checked)}
-                  className="accent-toyota-red cursor-pointer"
+                  disabled={readOnly}
+                  className="accent-toyota-red cursor-pointer disabled:cursor-not-allowed"
                   aria-label={t('emailTable.selectAll')}
                 />
               </th>
@@ -99,7 +100,8 @@ export default function EmailTable({
                         type="checkbox"
                         checked={selectedIds?.has(email.id) ?? false}
                         onChange={(e) => onSelectOne?.(email.id, e.target.checked)}
-                        className="accent-toyota-red cursor-pointer"
+                        disabled={readOnly}
+                        className="accent-toyota-red cursor-pointer disabled:cursor-not-allowed"
                         aria-label={t('emailTable.selectEmail', { id: email.id })}
                       />
                     </td>

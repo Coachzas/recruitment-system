@@ -6,7 +6,7 @@ function hasActiveFilters(f) {
   return f.startDate || f.endDate || f.subject || f.sender;
 }
 
-export default function FilterBar({ filters, onChange }) {
+export default function FilterBar({ filters, onChange, disabled = false }) {
   const { t } = useTranslation();
 
   function set(key, value) {
@@ -26,6 +26,7 @@ export default function FilterBar({ filters, onChange }) {
               className="input text-sm w-[150px]"
               value={filters.startDate}
               max={filters.endDate || undefined}
+              disabled={disabled}
               onChange={(e) => set('startDate', e.target.value)}
             />
           </div>
@@ -37,6 +38,7 @@ export default function FilterBar({ filters, onChange }) {
               className="input text-sm w-[150px]"
               value={filters.endDate}
               min={filters.startDate || undefined}
+              disabled={disabled}
               onChange={(e) => set('endDate', e.target.value)}
             />
           </div>
@@ -57,6 +59,7 @@ export default function FilterBar({ filters, onChange }) {
               className="input text-sm pl-7"
               placeholder={t('filterBar.subjectPlaceholder')}
               value={filters.subject}
+              disabled={disabled}
               onChange={(e) => set('subject', e.target.value)}
             />
           </div>
@@ -74,6 +77,7 @@ export default function FilterBar({ filters, onChange }) {
               className="input text-sm pl-6"
               placeholder={t('filterBar.senderPlaceholder')}
               value={filters.sender}
+              disabled={disabled}
               onChange={(e) => set('sender', e.target.value)}
             />
           </div>

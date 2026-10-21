@@ -21,13 +21,20 @@ const BLANK = {
   temperature: 0.0,
 };
 
+const DEMO_FORM = {
+  provider: 'gemini',
+  api_key: '',
+  model_name: DEFAULT_MODELS.gemini,
+  temperature: 0.2,
+};
+
 // ─── AiSettings Page ──────────────────────────────────────────────────────────
 
-export default function AiSettings() {
+export default function AiSettings({ demo = false }) {
   const { t } = useTranslation();
 
-  const [form, setForm]           = useState(BLANK);
-  const [loading, setLoading]     = useState(true);
+  const [form, setForm]           = useState(demo ? DEMO_FORM : BLANK);
+  const [loading, setLoading]     = useState(!demo);
   const [saving, setSaving]       = useState(false);
   const [saveMsg, setSaveMsg]     = useState(null); // { ok, text }
   const [testing, setTesting]     = useState(false);
@@ -36,6 +43,7 @@ export default function AiSettings() {
 
   // Load current settings on mount
   useEffect(() => {
+    if (demo) return;
     getAiSettings()
       .then((data) => {
         setForm({
@@ -48,7 +56,7 @@ export default function AiSettings() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [demo]);
 
   function setField(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -70,6 +78,7 @@ export default function AiSettings() {
 
   async function handleSave(e) {
     e.preventDefault();
+    if (demo) return;
     setSaveMsg(null);
     setSaving(true);
     try {
@@ -85,6 +94,7 @@ export default function AiSettings() {
   }
 
   async function handleTest() {
+    if (demo) return;
     setTestResult(null);
     setTesting(true);
     try {
@@ -134,7 +144,7 @@ export default function AiSettings() {
               </h2>
             </div>
 
-            <div className="p-4 space-y-4">
+            <fieldset disabled={demo} className="p-4 space-y-4 disabled:opacity-70">
 
               {/* Provider */}
               <div>
@@ -214,11 +224,11 @@ export default function AiSettings() {
 
               {/* Submit */}
               <div className="flex justify-end pt-2">
-                <button type="submit" disabled={saving} className="btn-primary">
+                <button type="submit" disabled={demo || saving} className="btn-primary">
                   {saving ? t('common.saving') : t('aiSettings.saveBtn')}
                 </button>
               </div>
-            </div>
+            </fieldset>
           </form>
         </div>
 
@@ -238,8 +248,9 @@ export default function AiSettings() {
               <button
                 type="button"
                 onClick={handleTest}
-                disabled={testing}
-                className="btn-primary w-full justify-center"
+                disabled={demo || testing}
+                title={demo ? t('demo.readOnlyNotice') : undefined}
+                className="btn-primary w-full justify-center disabled:opacity-50"
               >
                 {testing ? t('aiSettings.testing') : t('aiSettings.testBtn')}
               </button>

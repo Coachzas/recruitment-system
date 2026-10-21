@@ -16,6 +16,17 @@
 - **Dashboard** — ดูรายชื่อผู้สมัคร, คะแนน, และ Resume Preview ในหน้าเดียว
 - **รองรับ 2 ภาษา** — ภาษาไทย และ ภาษาอังกฤษ (i18n)
 
+## 🧪 โหมด Demo สำหรับ Portfolio
+
+หน้าแรกมีทางเลือก 2 โหมด:
+
+- **โหมดปกติ** — เข้าสู่ระบบและทำงานกับ backend/PostgreSQL ตามเดิม
+- **โหมด Demo** (`/demo`) — ดู Dashboard, โปรไฟล์ผู้สมัคร, เกณฑ์งาน, การเชื่อมต่อ และการตั้งค่า AI จากข้อมูลสมมติแบบอ่านอย่างเดียว ไม่เรียก API หรือฐานข้อมูล ปุ่มดึงอีเมล ตัวกรอง และตัวกำหนดเวลาจะแสดงเป็นตัวอย่างแต่ปิดการใช้งาน
+
+สำหรับ deploy frontend บน Vercel ให้กำหนด Root Directory เป็น `frontend`, Build Command เป็น `npm run build` และ Output Directory เป็น `dist` โดยมี `frontend/vercel.json` รองรับการเปิด URL ภายในเว็บโดยตรง
+
+หากต้องการให้โหมดปกติใช้งานกับ backend ที่แยกโฮสต์ ให้ตั้ง build environment variable `VITE_API_BASE_URL` เป็น URL API ที่ลงท้ายด้วย `/api` (ตัวอย่าง `https://api.example.com/api`) และตั้ง `ALLOWED_ORIGIN` ของ backend ให้ตรงกับ URL เว็บไซต์ Vercel ค่าเริ่มต้นของ frontend ยังคงเป็น `/api` เพื่อให้การพัฒนาแบบเดิมไม่เปลี่ยนแปลง
+
 ---
 
 ## 🛠️ เทคโนโลยีที่ใช้

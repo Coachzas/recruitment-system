@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchApplicant, rescoreApplicant } from '../api/applicants';
 import { attachmentDownloadUrl } from '../api/attachments';
 import ResumePreviewModal from '../components/ResumePreviewModal';
+import { demoApplicants } from '../data/demoData';
 
 // ─── Score ring (SVG) ─────────────────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ function InfoRow({ label, value }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ApplicantDetail() {
+export default function ApplicantDetail({ demo = false }) {
   const { t }      = useTranslation();
   const { id }     = useParams();
   const navigate   = useNavigate();
@@ -107,6 +108,13 @@ export default function ApplicantDetail() {
   const [previewAtt,  setPreviewAtt]  = useState(null); // attachment being previewed
 
   useEffect(() => {
+    if (demo) {
+      setApplicant(demoApplicants.find((candidate) => candidate.id === id) ?? null);
+      setLoading(false);
+      setError(null);
+      return undefined;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -115,9 +123,10 @@ export default function ApplicantDetail() {
       .catch(() => { if (!cancelled) setError(t('applicantDetail.error')); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [id, t]);
+  }, [demo, id, t]);
 
   async function handleRescore() {
+    if (demo) return;
     setRescoring(true);
     setRescoreMsg(null);
     try {
@@ -147,7 +156,7 @@ export default function ApplicantDetail() {
   if (error || !applicant) {
     return (
       <div className="p-6">
-        <button onClick={() => navigate('/applicants')} className="btn-ghost text-sm mb-4">
+        <button onClick={() => navigate(`${demo ? '/demo' : ''}/applicants`)} className="btn-ghost text-sm mb-4">
           {t('applicantDetail.backToList')}
         </button>
         <p className="text-toyota-red text-sm">{error || t('applicantDetail.notFound')}</p>
@@ -170,7 +179,7 @@ export default function ApplicantDetail() {
     <div className="p-6 space-y-5">
       {/* Back link */}
       <button
-        onClick={() => navigate('/applicants')}
+        onClick={() => navigate(`${demo ? '/demo' : ''}/applicants`)}
         className="text-sm text-gray-500 hover:text-toyota-red transition-colors flex items-center gap-1"
       >
         ← {t('applicantDetail.backToList')}
@@ -280,16 +289,16 @@ export default function ApplicantDetail() {
             {a.match_score !== null && a.match_score !== undefined && (
               <div className="w-full mt-1 space-y-1.5">
                 {[
-                  { label: t('applicantDetail.scoreBreakSkills'),     max: 50 },
-                  { label: t('applicantDetail.scoreBreakExperience'), max: 30 },
-                  { label: t('applicantDetail.scoreBreakBonus'),      max: 20 },
-                ].map(({ label, max }) => (
+                  { label: t('applicantDetail.scoreBreakSkills'), score: a.score_breakdown?.skills, max: 50 },
+                  { label: t('applicantDetail.scoreBreakExperience'), score: a.score_breakdown?.experience, max: 30 },
+                  { label: t('applicantDetail.scoreBreakBonus'), score: a.score_breakdown?.bonus, max: 20 },
+                ].map(({ label, score, max }) => (
                   <div key={label} className="flex items-center gap-2 text-xs text-gray-400">
                     <span className="w-36 flex-shrink-0">{label}</span>
                     <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-gray-300 rounded-full"
-                        style={{ width: `${max}%` }}
+                        style={{ width: `${((score ?? 0) / max) * 100}%` }}
                       />
                     </div>
                     <span className="w-8 text-right">/{max}</span>
@@ -336,19 +345,27 @@ export default function ApplicantDetail() {
                         {isPdf && (
                           <button
                             onClick={() => setPreviewAtt(att)}
+                            disabled={demo}
+                            title={demo ? t('demo.resumeUnavailable') : undefined}
                             className="text-xs font-semibold px-3 py-1.5 rounded border border-toyota-red text-toyota-red hover:bg-toyota-red hover:text-white transition-colors"
                           >
                             View
                           </button>
                         )}
-                        <a
-                          href={attachmentDownloadUrl(att.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap"
-                        >
-                          ⬇ Download
-                        </a>
+                        {demo ? (
+                          <button type="button" disabled title={t('demo.resumeUnavailable')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap opacity-50">
+                            ⬇ Download
+                          </button>
+                        ) : (
+                          <a
+                            href={attachmentDownloadUrl(att.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap"
+                          >
+                            ⬇ Download
+                          </a>
+                        )}
                       </div>
                     </div>
                   );
@@ -366,7 +383,8 @@ export default function ApplicantDetail() {
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={handleRescore}
-                disabled={rescoring}
+                disabled={demo || rescoring}
+                title={demo ? t('demo.readOnlyNotice') : undefined}
                 className="btn-primary text-sm px-4 py-2 flex items-center gap-2 disabled:opacity-50"
               >
                 {rescoring ? (

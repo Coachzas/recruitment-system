@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { loginApi } from '../api/auth';
 import useStore from '../store';
@@ -94,6 +94,9 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">{t('login.footer')}</p>
+        <Link to="/" className="block text-center text-sm text-gray-500 hover:text-toyota-red mt-4">
+          {t('entry.back')}
+        </Link>
       </div>
     </div>
   );
