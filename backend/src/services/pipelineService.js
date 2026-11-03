@@ -13,7 +13,7 @@ const { findMatchingCriteria, listJobCriteria } = require('./storageService');
  *
  * @param {string} resumeText
  * @param {{ subject?: string, sender?: string }} emailCtx
- * @returns {Promise<Object>}  Guaranteed: match_score=null, brief_rationale='Not Scored'
+ * @returns {Promise<Object>}  Guaranteed: match_score=null with a reason when scoring is skipped
  */
 async function extractBasicInfo(resumeText, emailCtx = {}) {
   const prompt = buildBasicExtractionPrompt(resumeText, emailCtx);
@@ -21,7 +21,7 @@ async function extractBasicInfo(resumeText, emailCtx = {}) {
   return {
     ...result,
     match_score:     null,
-    brief_rationale: 'Not Scored',
+    brief_rationale: 'Not scored because no matching job criteria were found for this position.',
   };
 }
 

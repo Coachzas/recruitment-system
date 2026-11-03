@@ -22,6 +22,17 @@ function scoreLabel(t, score) {
   return t('applicantDetail.scoreLow');
 }
 
+function getJustification(t, applicant) {
+  const rationale = applicant.evaluation_rationale || applicant.ai_summary;
+  if (
+    rationale === 'Not Scored' ||
+    rationale === 'Not scored because no matching job criteria were found for this position.'
+  ) {
+    return t('applicantDetail.noCriteriaReason');
+  }
+  return rationale;
+}
+
 function ScoreRing({ score }) {
   const SIZE   = 140;
   const STROKE = 12;
@@ -144,6 +155,8 @@ export default function ApplicantDetail({ demo = false }) {
       setTimeout(() => setRescoreMsg(null), 4000);
     }
   }
+
+  const justification = applicant ? getJustification(t, applicant) : null;
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (loading) {
@@ -311,9 +324,9 @@ export default function ApplicantDetail({ demo = false }) {
           {/* AI Justification */}
           <div className="card px-5 py-4">
             <SectionTitle>{t('applicantDetail.justification')}</SectionTitle>
-            {a.evaluation_rationale || a.ai_summary ? (
+            {justification ? (
               <p className="text-sm text-gray-600 leading-relaxed">
-                {a.evaluation_rationale || a.ai_summary}
+                {justification}
               </p>
             ) : (
               <p className="text-sm text-gray-400">{t('applicantDetail.noJustification')}</p>

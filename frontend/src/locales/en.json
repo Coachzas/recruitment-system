@@ -221,6 +221,7 @@
     "colMode": "Mode",
     "colScore": "Score",
     "colAiSummary": "AI Summary",
+    "noCriteriaReason": "No matching job criteria were found for this position, so the applicant was not scored.",
     "noEmails": "No emails found for this filter.",
     "pagination": {
       "summary": "{{total}} total · page {{page}} of {{totalPages}}",
@@ -432,6 +433,7 @@
     "scoreBreakExperience": "Experience",
     "scoreBreakBonus": "Bonus Criteria",
     "justification": "AI Justification",
+    "noCriteriaReason": "No matching job criteria were found for this position, so the applicant was not scored.",
     "noJustification": "No AI justification available.",
     "resume": "Resume File",
     "noResume": "No resume file on record.",

@@ -24,6 +24,16 @@ function ScoreCell({ score }) {
   );
 }
 
+function emailSummary(t, email) {
+  if (
+    email.ai_summary === 'Not Scored' ||
+    email.ai_summary === 'Not scored because no matching job criteria were found for this position.'
+  ) {
+    return t('emailTable.noCriteriaReason');
+  }
+  return email.ai_summary || email.error_message || '—';
+}
+
 function Skeleton({ cols }) {
   return (
     <tr>
@@ -137,7 +147,7 @@ export default function EmailTable({
                       <ScoreCell score={email.match_score} />
                     </td>
                     <td className="px-4 py-3 text-gray-500 max-w-xs truncate text-xs">
-                      {email.ai_summary || email.error_message || '—'}
+                      {emailSummary(t, email)}
                     </td>
                   </tr>
                 ))

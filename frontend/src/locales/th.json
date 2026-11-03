@@ -221,6 +221,7 @@
     "colMode": "โหมด",
     "colScore": "คะแนน",
     "colAiSummary": "สรุป AI",
+    "noCriteriaReason": "ไม่พบเกณฑ์ตำแหน่งงานที่ตรงกับผู้สมัคร จึงยังไม่ได้ประเมินคะแนน",
     "noEmails": "ไม่พบอีเมลสำหรับตัวกรองนี้",
     "pagination": {
       "summary": "{{total}} รายการ · หน้า {{page}} จาก {{totalPages}}",
@@ -432,6 +433,7 @@
     "scoreBreakExperience": "ประสบการณ์",
     "scoreBreakBonus": "เกณฑ์โบนัส",
     "justification": "เหตุผล AI",
+    "noCriteriaReason": "ไม่พบเกณฑ์ตำแหน่งงานที่ตรงกับผู้สมัคร จึงยังไม่ได้ประเมินคะแนน",
     "noJustification": "ไม่มีคำอธิบายจาก AI",
     "resume": "ไฟล์เรซูเม่",
     "noResume": "ไม่มีไฟล์เรซูเม่",
