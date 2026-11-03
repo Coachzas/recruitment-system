@@ -120,7 +120,9 @@ export default function EmailTable({
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-800 max-w-xs">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="truncate">{email.subject || '(no subject)'}</span>
+                        <span className="truncate" title={email.subject || '(no subject)'}>
+                          {email.subject || '(no subject)'}
+                        </span>
                         {Number(email.attachment_count) > 0 && (
                           <span
                             className="flex-shrink-0 text-gray-400 text-sm select-none"
@@ -131,7 +133,10 @@ export default function EmailTable({
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 max-w-[180px] truncate">
+                    <td
+                      className="px-4 py-3 text-gray-600 max-w-[180px] truncate"
+                      title={email.sender || ''}
+                    >
                       {email.sender || '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
@@ -146,7 +151,10 @@ export default function EmailTable({
                     <td className="px-4 py-3 text-center">
                       <ScoreCell score={email.match_score} />
                     </td>
-                    <td className="px-4 py-3 text-gray-500 max-w-xs truncate text-xs">
+                    <td
+                      className="px-4 py-3 text-gray-500 max-w-xs truncate text-xs"
+                      title={emailSummary(t, email)}
+                    >
                       {emailSummary(t, email)}
                     </td>
                   </tr>
